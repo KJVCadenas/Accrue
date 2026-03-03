@@ -6,6 +6,8 @@ import {
 import { AccountWithBalance, Transaction } from "../types";
 import * as api from "../lib/tauri";
 import AddTransactionModal from "../components/AddTransactionModal";
+import AddAccountModal from "../components/AddAccountModal";
+import ConfirmModal from "../components/ConfirmModal";
 
 const fmt = (n: number) =>
   n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -23,6 +25,8 @@ export default function AccountDetail() {
   const [accounts, setAccounts] = useState<AccountWithBalance[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
+  const [showEditAccount, setShowEditAccount] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   async function load() {
     if (!id) return;
@@ -65,9 +69,21 @@ export default function AccountDetail() {
             {typeIcon[account.type]} {account.name}
           </h1>
         </div>
-        <button className="btn btn-primary" onClick={() => { setEditing(null); setShowModal(true); }}>
-          + Transaction
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn" onClick={() => setShowEditAccount(true)}>
+            Edit Account
+          </button>
+          <button
+            className="btn"
+            style={{ color: "var(--expense)" }}
+            onClick={() => setShowDeleteConfirm(true)}
+          >
+            Delete
+          </button>
+          <button className="btn btn-primary" onClick={() => { setEditing(null); setShowModal(true); }}>
+            + Transaction
+          </button>
+        </div>
       </div>
 
       <div className="card-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
@@ -158,6 +174,27 @@ export default function AccountDetail() {
           editing={editing}
           onClose={() => setShowModal(false)}
           onSaved={() => { setShowModal(false); load(); }}
+        />
+      )}
+
+      {showEditAccount && account && (
+        <AddAccountModal
+          editing={account}
+          onClose={() => setShowEditAccount(false)}
+          onSaved={() => { setShowEditAccount(false); load(); }}
+        />
+      )}
+
+      {showDeleteConfirm && account && (
+        <ConfirmModal
+          message={`Permanently delete "${account.name}" and all its transactions? This cannot be undone.`}
+          confirmLabel="Delete"
+          danger
+          onConfirm={async () => {
+            await api.deleteAccount(account.id);
+            navigate("/accounts");
+          }}
+          onCancel={() => setShowDeleteConfirm(false)}
         />
       )}
     </div>

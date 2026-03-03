@@ -63,6 +63,7 @@ export interface CategorySpend {
 
 export interface DashboardData {
   net_worth: number;
+  liquid_balance: number;
   monthly_income: number;
   monthly_expenses: number;
   accounts: AccountWithBalance[];

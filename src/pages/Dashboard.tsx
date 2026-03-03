@@ -59,8 +59,16 @@ export default function Dashboard() {
       {/* Summary stats */}
       <div className="card-grid">
         <div className="stat-card">
+          <div className="stat-label">Liquid</div>
+          <div className={`stat-value ${data.liquid_balance >= 0 ? "income" : "expense"}`}>
+            ₱{fmt(data.liquid_balance)}
+          </div>
+        </div>
+        <div className="stat-card">
           <div className="stat-label">Net Worth</div>
-          <div className="stat-value">₱{fmt(data.net_worth)}</div>
+          <div className={`stat-value ${data.net_worth >= 0 ? "income" : "expense"}`}>
+            ₱{fmt(data.net_worth)}
+          </div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Month Income</div>
@@ -69,16 +77,6 @@ export default function Dashboard() {
         <div className="stat-card">
           <div className="stat-label">Month Expenses</div>
           <div className="stat-value expense">₱{fmt(data.monthly_expenses)}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Month Net</div>
-          <div
-            className={`stat-value ${
-              data.monthly_income - data.monthly_expenses >= 0 ? "income" : "expense"
-            }`}
-          >
-            ₱{fmt(data.monthly_income - data.monthly_expenses)}
-          </div>
         </div>
       </div>
 

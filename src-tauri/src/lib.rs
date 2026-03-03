@@ -25,6 +25,7 @@ pub fn run() {
             commands::accounts::update_account,
             commands::accounts::archive_account,
             commands::accounts::restore_account,
+            commands::accounts::delete_account,
             commands::transactions::list_transactions,
             commands::transactions::create_transaction,
             commands::transactions::update_transaction,

@@ -81,6 +81,7 @@ pub struct Transfer {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DashboardData {
     pub net_worth: f64,
+    pub liquid_balance: f64,
     pub monthly_income: f64,
     pub monthly_expenses: f64,
     pub accounts: Vec<AccountWithBalance>,

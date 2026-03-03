@@ -18,7 +18,7 @@ pub fn compute_balance(conn: &Connection, account: &Account) -> f64 {
                 |r| r.get(0),
             )
             .unwrap_or(0.0);
-        expenses - income
+        account.opening_balance + expenses - income
     } else {
         // For cash/debit/savings/investment:
         // opening_balance + income - expenses

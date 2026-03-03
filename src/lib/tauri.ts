@@ -25,7 +25,16 @@ export const createAccount = (data: {
   credit_limit?: number | null;
   billing_cycle_day?: number | null;
   payment_due_day?: number | null;
-}) => invoke<AccountWithBalance>("create_account", data);
+}) =>
+  invoke<AccountWithBalance>("create_account", {
+    name: data.name,
+    accountType: data.account_type,
+    subtype: data.subtype,
+    openingBalance: data.opening_balance,
+    creditLimit: data.credit_limit,
+    billingCycleDay: data.billing_cycle_day,
+    paymentDueDay: data.payment_due_day,
+  });
 
 export const updateAccount = (
   id: number,
@@ -38,13 +47,26 @@ export const updateAccount = (
     billing_cycle_day?: number | null;
     payment_due_day?: number | null;
   }
-) => invoke<AccountWithBalance>("update_account", { id, ...data });
+) =>
+  invoke<AccountWithBalance>("update_account", {
+    id,
+    name: data.name,
+    accountType: data.account_type,
+    subtype: data.subtype,
+    openingBalance: data.opening_balance,
+    creditLimit: data.credit_limit,
+    billingCycleDay: data.billing_cycle_day,
+    paymentDueDay: data.payment_due_day,
+  });
 
 export const archiveAccount = (id: number) =>
   invoke<void>("archive_account", { id });
 
 export const restoreAccount = (id: number) =>
   invoke<void>("restore_account", { id });
+
+export const deleteAccount = (id: number) =>
+  invoke<void>("delete_account", { id });
 
 export const listTransactions = (filters?: {
   account_id?: number | null;
@@ -53,19 +75,57 @@ export const listTransactions = (filters?: {
   date_from?: string | null;
   date_to?: string | null;
   search?: string | null;
-}) => invoke<Transaction[]>("list_transactions", filters ?? {});
+}) => {
+  const f = filters ?? {};
+  return invoke<Transaction[]>("list_transactions", {
+    accountId: f.account_id,
+    categoryId: f.category_id,
+    txType: f.tx_type,
+    dateFrom: f.date_from,
+    dateTo: f.date_to,
+    search: f.search,
+  });
+};
 
 export const createTransaction = (data: CreateTransactionInput) =>
-  invoke<Transaction>("create_transaction", { ...data });
+  invoke<Transaction>("create_transaction", {
+    accountId: data.account_id,
+    categoryId: data.category_id,
+    txType: data.tx_type,
+    amount: data.amount,
+    date: data.date,
+    notes: data.notes,
+    isRecurring: data.is_recurring,
+    recurrenceFrequency: data.recurrence_frequency,
+    nextDueDate: data.next_due_date,
+  });
 
 export const updateTransaction = (id: number, data: CreateTransactionInput) =>
-  invoke<Transaction>("update_transaction", { id, ...data });
+  invoke<Transaction>("update_transaction", {
+    id,
+    accountId: data.account_id,
+    categoryId: data.category_id,
+    txType: data.tx_type,
+    amount: data.amount,
+    date: data.date,
+    notes: data.notes,
+    isRecurring: data.is_recurring,
+    recurrenceFrequency: data.recurrence_frequency,
+    nextDueDate: data.next_due_date,
+  });
 
 export const deleteTransaction = (id: number) =>
   invoke<void>("delete_transaction", { id });
 
 export const createTransfer = (data: CreateTransferInput) =>
-  invoke<Transfer>("create_transfer", { ...data });
+  invoke<Transfer>("create_transfer", {
+    fromAccountId: data.from_account_id,
+    toAccountId: data.to_account_id,
+    amount: data.amount,
+    date: data.date,
+    notes: data.notes,
+    transferType: data.transfer_type,
+  });
 
 export const deleteTransfer = (id: number) =>
   invoke<void>("delete_transfer", { id });

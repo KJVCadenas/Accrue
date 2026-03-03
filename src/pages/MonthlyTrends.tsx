@@ -22,7 +22,7 @@ export default function MonthlyTrends() {
     <div>
       <div className="page-header">
         <h1 className="page-title">Monthly Trends</h1>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div className="filters" style={{ marginBottom: 0 }}>
           <label style={{ fontSize: 13, color: "var(--text-muted)" }}>Months:</label>
           <select value={months} onChange={(e) => setMonths(Number(e.target.value))}>
             <option value={3}>3 months</option>

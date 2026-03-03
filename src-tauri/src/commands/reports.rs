@@ -91,6 +91,15 @@ pub fn get_dashboard(state: State<DbState>) -> Result<DashboardData, String> {
         }
     });
 
+    // Liquid balance: only cash + debit minus credit (excludes savings & investment)
+    let liquid_balance = accounts.iter().fold(0.0_f64, |acc, a| {
+        match a.account_type.as_str() {
+            "credit"         => acc - a.balance,
+            "cash" | "debit" => acc + a.balance,
+            _                => acc,
+        }
+    });
+
     // Monthly income and expenses (current month)
     let monthly_income: f64 = conn
         .query_row(
@@ -154,6 +163,7 @@ pub fn get_dashboard(state: State<DbState>) -> Result<DashboardData, String> {
 
     Ok(DashboardData {
         net_worth,
+        liquid_balance,
         monthly_income,
         monthly_expenses,
         accounts,

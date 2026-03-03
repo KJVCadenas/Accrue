@@ -31,7 +31,7 @@ export default function SpendingBreakdown() {
     <div>
       <div className="page-header">
         <h1 className="page-title">Spending Breakdown</h1>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div className="filters" style={{ marginBottom: 0 }}>
           <select value={month} onChange={(e) => setMonth(Number(e.target.value))}>
             {months.map((m, i) => (
               <option key={i+1} value={i+1}>{m}</option>
@@ -41,7 +41,7 @@ export default function SpendingBreakdown() {
             type="number"
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
-            style={{ width: 80, padding: "7px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius)" }}
+            style={{ width: 80 }}
           />
         </div>
       </div>

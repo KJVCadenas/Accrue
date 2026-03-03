@@ -211,3 +211,13 @@ pub fn restore_account(state: State<DbState>, id: i64) -> Result<(), String> {
     .map_err(|e| e.to_string())?;
     Ok(())
 }
+
+#[tauri::command]
+pub fn delete_account(state: State<DbState>, id: i64) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM transactions WHERE account_id = ?1", [id])
+        .map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM accounts WHERE id = ?1", [id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}

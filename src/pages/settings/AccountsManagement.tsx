@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { AccountWithBalance } from "../../types";
 import * as api from "../../lib/tauri";
 import AddAccountModal from "../../components/AddAccountModal";
+import ConfirmModal from "../../components/ConfirmModal";
 
 const fmt = (n: number) =>
   n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -15,6 +16,12 @@ export default function AccountsManagement() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<AccountWithBalance | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{
+    message: string;
+    confirmLabel: string;
+    danger?: boolean;
+    onConfirm: () => Promise<void>;
+  } | null>(null);
 
   async function load() {
     setAccounts(await api.listAccounts());
@@ -92,12 +99,11 @@ export default function AccountsManagement() {
                       {a.is_active === 1 ? (
                         <button
                           className="btn btn-sm"
-                          onClick={async () => {
-                            if (confirm(`Archive "${a.name}"?`)) {
-                              await api.archiveAccount(a.id);
-                              load();
-                            }
-                          }}
+                          onClick={() => setConfirmAction({
+                            message: `Archive "${a.name}"? It will be hidden from the main view but its data will be preserved.`,
+                            confirmLabel: "Archive",
+                            onConfirm: async () => { await api.archiveAccount(a.id); load(); },
+                          })}
                         >
                           Archive
                         </button>
@@ -109,6 +115,18 @@ export default function AccountsManagement() {
                           Restore
                         </button>
                       )}
+                      <button
+                        className="btn btn-sm"
+                        style={{ color: "var(--expense)" }}
+                        onClick={() => setConfirmAction({
+                          message: `Permanently delete "${a.name}" and all its transactions? This cannot be undone.`,
+                          confirmLabel: "Delete",
+                          danger: true,
+                          onConfirm: async () => { await api.deleteAccount(a.id); load(); },
+                        })}
+                      >
+                        Delete
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -123,6 +141,19 @@ export default function AccountsManagement() {
           editing={editing}
           onClose={() => setShowModal(false)}
           onSaved={() => { setShowModal(false); load(); }}
+        />
+      )}
+
+      {confirmAction && (
+        <ConfirmModal
+          message={confirmAction.message}
+          confirmLabel={confirmAction.confirmLabel}
+          danger={confirmAction.danger}
+          onConfirm={async () => {
+            await confirmAction.onConfirm();
+            setConfirmAction(null);
+          }}
+          onCancel={() => setConfirmAction(null)}
         />
       )}
     </div>
