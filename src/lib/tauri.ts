@@ -130,6 +130,18 @@ export const createTransfer = (data: CreateTransferInput) =>
 export const deleteTransfer = (id: number) =>
   invoke<void>("delete_transfer", { id });
 
+export const getTransfer = (id: number) =>
+  invoke<Transfer>("get_transfer", { id });
+
+export const updateTransfer = (id: number, data: { amount: number; date: string; notes: string | null; transfer_type: string }) =>
+  invoke<Transfer>("update_transfer", {
+    id,
+    amount: data.amount,
+    date: data.date,
+    notes: data.notes,
+    transferType: data.transfer_type,
+  });
+
 export const listCategories = () => invoke<Category[]>("list_categories");
 
 export const createCategory = (data: {
@@ -156,6 +168,9 @@ export const getSpendingBreakdown = (year: number, month: number) =>
 
 export const getMonthlyTrends = (months: number) =>
   invoke<MonthSummary[]>("get_monthly_trends", { months });
+
+export const processRecurringTransactions = () =>
+  invoke<number>("process_recurring_transactions");
 
 export const exportTransactionsCsv = () =>
   invoke<void>("export_transactions_csv");

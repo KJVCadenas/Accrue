@@ -27,6 +27,7 @@ export default function AccountDetail() {
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [showEditAccount, setShowEditAccount] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [confirmDeleteTx, setConfirmDeleteTx] = useState<Transaction | null>(null);
 
   async function load() {
     if (!id) return;
@@ -151,13 +152,21 @@ export default function AccountDetail() {
                       {t.type === "income" ? "+" : "-"}₱{fmt(t.amount)}
                     </td>
                     <td>
-                      <button
-                        className="btn btn-sm"
-                        onClick={() => { setEditing(t); setShowModal(true); }}
-                        disabled={!!t.transfer_id}
-                      >
-                        Edit
-                      </button>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <button
+                          className="btn btn-sm"
+                          onClick={() => { setEditing(t); setShowModal(true); }}
+                          disabled={!!t.transfer_id}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="btn btn-sm btn-danger"
+                          onClick={() => setConfirmDeleteTx(t)}
+                        >
+                          Del
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -195,6 +204,28 @@ export default function AccountDetail() {
             navigate("/accounts");
           }}
           onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
+
+      {confirmDeleteTx && (
+        <ConfirmModal
+          message={
+            confirmDeleteTx.transfer_id
+              ? "Delete this transfer? Both legs (from and to account) will be removed."
+              : "Delete this transaction? This cannot be undone."
+          }
+          confirmLabel="Delete"
+          danger
+          onConfirm={async () => {
+            if (confirmDeleteTx.transfer_id) {
+              await api.deleteTransfer(confirmDeleteTx.transfer_id);
+            } else {
+              await api.deleteTransaction(confirmDeleteTx.id);
+            }
+            setConfirmDeleteTx(null);
+            load();
+          }}
+          onCancel={() => setConfirmDeleteTx(null)}
         />
       )}
     </div>

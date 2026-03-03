@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { processRecurringTransactions } from "./lib/tauri";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
@@ -11,6 +13,10 @@ import AccountsManagement from "./pages/settings/AccountsManagement";
 import DataBackup from "./pages/settings/DataBackup";
 
 function App() {
+  useEffect(() => {
+    processRecurringTransactions().catch(console.error);
+  }, []);
+
   return (
     <MemoryRouter>
       <Routes>

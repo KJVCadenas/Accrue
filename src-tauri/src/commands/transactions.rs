@@ -34,26 +34,49 @@ pub fn list_transactions(
 ) -> Result<Vec<Transaction>, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
 
+    let mut param_idx = 0usize;
     let mut conditions = vec!["1=1".to_string()];
+    let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
     if let Some(aid) = account_id {
-        conditions.push(format!("t.account_id = {}", aid));
+        param_idx += 1;
+        conditions.push(format!("t.account_id = ?{}", param_idx));
+        params.push(Box::new(aid));
     }
     if let Some(cid) = category_id {
-        conditions.push(format!("t.category_id = {}", cid));
+        param_idx += 1;
+        conditions.push(format!("t.category_id = ?{}", param_idx));
+        params.push(Box::new(cid));
     }
     if let Some(ref tt) = tx_type {
-        conditions.push(format!("t.type = '{}'", tt.replace('\'', "''")));
+        param_idx += 1;
+        conditions.push(format!("t.type = ?{}", param_idx));
+        params.push(Box::new(tt.clone()));
     }
     if let Some(ref df) = date_from {
-        conditions.push(format!("t.date >= '{}'", df.replace('\'', "''")));
+        param_idx += 1;
+        conditions.push(format!("t.date >= ?{}", param_idx));
+        params.push(Box::new(df.clone()));
     }
     if let Some(ref dt) = date_to {
-        conditions.push(format!("t.date <= '{}'", dt.replace('\'', "''")));
+        param_idx += 1;
+        conditions.push(format!("t.date <= ?{}", param_idx));
+        params.push(Box::new(dt.clone()));
     }
     if let Some(ref s) = search {
-        let escaped = s.replace('\'', "''");
-        conditions.push(format!("(t.notes LIKE '%{}%' OR c.name LIKE '%{}%' OR a.name LIKE '%{}%')", escaped, escaped, escaped));
+        let pat = format!("%{}%", s);
+        conditions.push(format!(
+            "(t.notes LIKE ?{} OR c.name LIKE ?{} OR a.name LIKE ?{})",
+            param_idx + 1,
+            param_idx + 2,
+            param_idx + 3
+        ));
+        param_idx += 3;
+        params.push(Box::new(pat.clone()));
+        params.push(Box::new(pat.clone()));
+        params.push(Box::new(pat));
     }
+    let _ = param_idx;
 
     let where_clause = conditions.join(" AND ");
     let sql = format!(
@@ -70,8 +93,9 @@ pub fn list_transactions(
     );
 
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let params_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|b| b.as_ref()).collect();
     let txns = stmt
-        .query_map([], |row| row_to_transaction(row))
+        .query_map(params_refs.as_slice(), |row| row_to_transaction(row))
         .map_err(|e| e.to_string())?
         .filter_map(|r| r.ok())
         .collect();
@@ -181,4 +205,70 @@ pub fn delete_transaction(state: State<DbState>, id: i64) -> Result<(), String> 
             .map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+#[tauri::command]
+pub fn process_recurring_transactions(state: State<DbState>) -> Result<i32, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+
+    let today: String = conn
+        .query_row("SELECT DATE('now')", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+
+    let due: Vec<Transaction> = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT t.id, t.account_id, t.category_id, t.transfer_id, t.type, t.amount,
+                 t.date, t.notes, t.is_recurring, t.recurrence_frequency, t.next_due_date,
+                 t.created_at, t.updated_at, c.name, a.name
+                 FROM transactions t
+                 LEFT JOIN categories c ON t.category_id = c.id
+                 LEFT JOIN accounts a ON t.account_id = a.id
+                 WHERE t.is_recurring = 1 AND t.next_due_date IS NOT NULL AND t.next_due_date <= ?1",
+            )
+            .map_err(|e| e.to_string())?;
+        stmt.query_map([today.as_str()], |row| row_to_transaction(row))
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect()
+    };
+
+    let mut count = 0i32;
+    for t in due {
+        let mut next_date = t.next_due_date.clone().unwrap();
+        let freq = t.recurrence_frequency.as_deref().unwrap_or("monthly");
+
+        while next_date <= today {
+            conn.execute(
+                "INSERT INTO transactions (account_id, category_id, type, amount, date, notes, is_recurring)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0)",
+                rusqlite::params![t.account_id, t.category_id, t.tx_type, t.amount, next_date, t.notes],
+            )
+            .map_err(|e| e.to_string())?;
+
+            let delta = match freq {
+                "daily" => "+1 day",
+                "weekly" => "+7 days",
+                "yearly" => "+1 year",
+                _ => "+1 month",
+            };
+            next_date = conn
+                .query_row(
+                    "SELECT DATE(?1, ?2)",
+                    rusqlite::params![next_date, delta],
+                    |row| row.get::<_, String>(0),
+                )
+                .map_err(|e| e.to_string())?;
+
+            count += 1;
+        }
+
+        conn.execute(
+            "UPDATE transactions SET next_due_date = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![next_date, t.id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    Ok(count)
 }

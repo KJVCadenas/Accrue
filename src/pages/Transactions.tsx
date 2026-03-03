@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { AccountWithBalance, Category, Transaction } from "../types";
+import { AccountWithBalance, Category, Transaction, Transfer } from "../types";
 import * as api from "../lib/tauri";
 import AddTransactionModal from "../components/AddTransactionModal";
+import AddTransferModal from "../components/AddTransferModal";
+import ConfirmModal from "../components/ConfirmModal";
 
 const fmt = (n: number) =>
   n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -12,6 +14,8 @@ export default function Transactions() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
+  const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Transaction | null>(null);
 
   // Filters
   const [filterAccount, setFilterAccount] = useState("");
@@ -42,8 +46,11 @@ export default function Transactions() {
   useEffect(() => { load(); }, [filterAccount, filterType, filterCategory, filterFrom, filterTo, search]);
 
   async function handleDelete(t: Transaction) {
-    if (!confirm("Delete this transaction?")) return;
-    await api.deleteTransaction(t.id);
+    if (t.transfer_id) {
+      await api.deleteTransfer(t.transfer_id);
+    } else {
+      await api.deleteTransaction(t.id);
+    }
     load();
   }
 
@@ -130,15 +137,21 @@ export default function Transactions() {
                       <div style={{ display: "flex", gap: 4 }}>
                         <button
                           className="btn btn-sm"
-                          onClick={() => { setEditing(t); setShowModal(true); }}
-                          disabled={!!t.transfer_id}
-                          title={t.transfer_id ? "Edit via transfer" : "Edit"}
+                          onClick={async () => {
+                            if (t.transfer_id) {
+                              const tr = await api.getTransfer(t.transfer_id);
+                              setEditingTransfer(tr);
+                            } else {
+                              setEditing(t);
+                              setShowModal(true);
+                            }
+                          }}
                         >
                           Edit
                         </button>
                         <button
                           className="btn btn-sm btn-danger"
-                          onClick={() => handleDelete(t)}
+                          onClick={() => setConfirmDelete(t)}
                         >
                           Del
                         </button>
@@ -159,6 +172,29 @@ export default function Transactions() {
           editing={editing}
           onClose={() => setShowModal(false)}
           onSaved={() => { setShowModal(false); load(); }}
+        />
+      )}
+
+      {editingTransfer && (
+        <AddTransferModal
+          accounts={accounts}
+          editing={editingTransfer}
+          onClose={() => setEditingTransfer(null)}
+          onSaved={() => { setEditingTransfer(null); load(); }}
+        />
+      )}
+
+      {confirmDelete && (
+        <ConfirmModal
+          message={
+            confirmDelete.transfer_id
+              ? "Delete this transfer? Both legs (from and to account) will be removed."
+              : "Delete this transaction? This cannot be undone."
+          }
+          confirmLabel="Delete"
+          danger
+          onConfirm={async () => { await handleDelete(confirmDelete); setConfirmDelete(null); }}
+          onCancel={() => setConfirmDelete(null)}
         />
       )}
     </div>

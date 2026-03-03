@@ -71,3 +71,45 @@ pub fn delete_transfer(state: State<DbState>, id: i64) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     Ok(())
 }
+
+#[tauri::command]
+pub fn get_transfer(state: State<DbState>, id: i64) -> Result<Transfer, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.query_row(
+        "SELECT id, from_account_id, to_account_id, amount, date, notes, transfer_type, created_at
+         FROM transfers WHERE id = ?1",
+        [id],
+        |row| row_to_transfer(row),
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_transfer(
+    state: State<DbState>,
+    id: i64,
+    amount: f64,
+    date: String,
+    notes: Option<String>,
+    transfer_type: String,
+) -> Result<Transfer, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE transfers SET amount=?1, date=?2, notes=?3, transfer_type=?4 WHERE id=?5",
+        rusqlite::params![amount, date, notes, transfer_type, id],
+    )
+    .map_err(|e| e.to_string())?;
+    // Update both transaction legs (amount, date, notes)
+    conn.execute(
+        "UPDATE transactions SET amount=?1, date=?2, notes=?3, updated_at=datetime('now') WHERE transfer_id=?4",
+        rusqlite::params![amount, date, notes, id],
+    )
+    .map_err(|e| e.to_string())?;
+    conn.query_row(
+        "SELECT id, from_account_id, to_account_id, amount, date, notes, transfer_type, created_at
+         FROM transfers WHERE id = ?1",
+        [id],
+        |row| row_to_transfer(row),
+    )
+    .map_err(|e| e.to_string())
+}

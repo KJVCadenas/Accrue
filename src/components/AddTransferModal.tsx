@@ -1,41 +1,53 @@
 import { useState } from "react";
-import { AccountWithBalance } from "../types";
+import { AccountWithBalance, Transfer } from "../types";
 import * as api from "../lib/tauri";
 
 interface Props {
   accounts: AccountWithBalance[];
+  editing?: Transfer | null;
   onClose: () => void;
   onSaved: () => void;
 }
 
-export default function AddTransferModal({ accounts, onClose, onSaved }: Props) {
+export default function AddTransferModal({ accounts, editing, onClose, onSaved }: Props) {
   const activeAccounts = accounts.filter((a) => a.is_active === 1);
-  const [fromId, setFromId] = useState<number>(activeAccounts[0]?.id ?? 0);
-  const [toId, setToId] = useState<number>(activeAccounts[1]?.id ?? 0);
-  const [amount, setAmount] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [notes, setNotes] = useState("");
-  const [transferType, setTransferType] = useState<"regular" | "credit_payment">("regular");
+  const [fromId, setFromId] = useState<number>(editing?.from_account_id ?? activeAccounts[0]?.id ?? 0);
+  const [toId, setToId] = useState<number>(editing?.to_account_id ?? activeAccounts[1]?.id ?? 0);
+  const [amount, setAmount] = useState(editing ? String(editing.amount) : "");
+  const [date, setDate] = useState(editing?.date ?? new Date().toISOString().split("T")[0]);
+  const [notes, setNotes] = useState(editing?.notes ?? "");
+  const [transferType, setTransferType] = useState<"regular" | "credit_payment">(
+    (editing?.transfer_type as "regular" | "credit_payment") ?? "regular"
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!amount || fromId === toId) {
+    if (!amount || (!editing && fromId === toId)) {
       setError("Select different from/to accounts and enter an amount.");
       return;
     }
     setLoading(true);
     setError("");
     try {
-      await api.createTransfer({
-        from_account_id: fromId,
-        to_account_id: toId,
-        amount: parseFloat(amount),
-        date,
-        notes: notes || null,
-        transfer_type: transferType,
-      });
+      if (editing) {
+        await api.updateTransfer(editing.id, {
+          amount: parseFloat(amount),
+          date,
+          notes: notes || null,
+          transfer_type: transferType,
+        });
+      } else {
+        await api.createTransfer({
+          from_account_id: fromId,
+          to_account_id: toId,
+          amount: parseFloat(amount),
+          date,
+          notes: notes || null,
+          transfer_type: transferType,
+        });
+      }
       onSaved();
     } catch (err: any) {
       setError(String(err));
@@ -47,7 +59,7 @@ export default function AddTransferModal({ accounts, onClose, onSaved }: Props) 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-title">Add Transfer</div>
+        <div className="modal-title">{editing ? "Edit Transfer" : "Add Transfer"}</div>
 
         <div className="toggle-group">
           <button
@@ -69,23 +81,29 @@ export default function AddTransferModal({ accounts, onClose, onSaved }: Props) 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>From Account</label>
-            <select value={fromId} onChange={(e) => setFromId(Number(e.target.value))}>
+            <select value={fromId} onChange={(e) => setFromId(Number(e.target.value))} disabled={!!editing}>
               {activeAccounts.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name}
                 </option>
               ))}
+              {editing && !activeAccounts.find((a) => a.id === editing.from_account_id) && (
+                <option value={editing.from_account_id}>(archived account)</option>
+              )}
             </select>
           </div>
 
           <div className="form-group">
             <label>To Account</label>
-            <select value={toId} onChange={(e) => setToId(Number(e.target.value))}>
+            <select value={toId} onChange={(e) => setToId(Number(e.target.value))} disabled={!!editing}>
               {activeAccounts.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name}
                 </option>
               ))}
+              {editing && !activeAccounts.find((a) => a.id === editing.to_account_id) && (
+                <option value={editing.to_account_id}>(archived account)</option>
+              )}
             </select>
           </div>
 
@@ -132,7 +150,7 @@ export default function AddTransferModal({ accounts, onClose, onSaved }: Props) 
               Cancel
             </button>
             <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? "Saving…" : "Transfer"}
+              {loading ? "Saving…" : editing ? "Save Changes" : "Transfer"}
             </button>
           </div>
         </form>
