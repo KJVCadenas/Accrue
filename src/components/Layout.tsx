@@ -9,11 +9,16 @@ const links = [
   { to: "/settings/categories", label: "Categories", icon: "🏷️", section: "Settings" },
   { to: "/settings/accounts", label: "Manage Accounts", icon: "⚙️", section: "Settings" },
   { to: "/settings/data", label: "Data & Backup", icon: "💾", section: "Settings" },
+  { to: "/settings/security", label: "Security", icon: "🔒", section: "Settings" },
 ];
 
 const sections = ["Main", "Reports", "Settings"];
 
-export default function Layout() {
+interface Props {
+  onLock: () => void;
+}
+
+export default function Layout({ onLock }: Props) {
   return (
     <div className="app-layout">
       <nav className="sidebar">
@@ -39,6 +44,12 @@ export default function Layout() {
                 ))}
             </div>
           ))}
+        </div>
+        <div className="sidebar-footer">
+          <button className="sidebar-lock-btn" onClick={onLock}>
+            <span>🔐</span>
+            <span>Lock</span>
+          </button>
         </div>
       </nav>
       <main className="main-content">

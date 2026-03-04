@@ -43,7 +43,8 @@ fn row_to_transaction(row: &rusqlite::Row) -> rusqlite::Result<Transaction> {
 
 #[tauri::command]
 pub fn get_dashboard(state: State<DbState>) -> Result<DashboardData, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
 
     // Load all active accounts with balances
     let mut stmt = conn
@@ -63,7 +64,7 @@ pub fn get_dashboard(state: State<DbState>) -> Result<DashboardData, String> {
     let accounts: Vec<AccountWithBalance> = accounts_raw
         .iter()
         .map(|a| {
-            let balance = compute_balance(&conn, a);
+            let balance = compute_balance(conn, a);
             AccountWithBalance {
                 id: a.id,
                 name: a.name.clone(),
@@ -178,7 +179,8 @@ pub fn get_spending_breakdown(
     year: i64,
     month: i64,
 ) -> Result<SpendingBreakdown, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
     let period = format!("{:04}-{:02}", year, month);
 
     let total_income: f64 = conn
@@ -230,7 +232,8 @@ pub fn get_spending_breakdown(
 
 #[tauri::command]
 pub fn get_monthly_trends(state: State<DbState>, months: i64) -> Result<Vec<MonthSummary>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
     let limit = months.min(24).max(1);
 
     let mut stmt = conn

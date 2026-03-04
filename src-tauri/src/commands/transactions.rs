@@ -32,7 +32,8 @@ pub fn list_transactions(
     date_to: Option<String>,
     search: Option<String>,
 ) -> Result<Vec<Transaction>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
 
     let mut param_idx = 0usize;
     let mut conditions = vec!["1=1".to_string()];
@@ -116,7 +117,8 @@ pub fn create_transaction(
     recurrence_frequency: Option<String>,
     next_due_date: Option<String>,
 ) -> Result<Transaction, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
     let is_recurring_int: i64 = if is_recurring { 1 } else { 0 };
     conn.execute(
         "INSERT INTO transactions (account_id, category_id, type, amount, date, notes, is_recurring, recurrence_frequency, next_due_date)
@@ -154,7 +156,8 @@ pub fn update_transaction(
     recurrence_frequency: Option<String>,
     next_due_date: Option<String>,
 ) -> Result<Transaction, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
     let is_recurring_int: i64 = if is_recurring { 1 } else { 0 };
     conn.execute(
         "UPDATE transactions SET account_id=?1, category_id=?2, type=?3, amount=?4,
@@ -180,7 +183,8 @@ pub fn update_transaction(
 
 #[tauri::command]
 pub fn delete_transaction(state: State<DbState>, id: i64) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
 
     // Check if linked to a transfer
     let transfer_id: Option<i64> = conn
@@ -209,7 +213,8 @@ pub fn delete_transaction(state: State<DbState>, id: i64) -> Result<(), String> 
 
 #[tauri::command]
 pub fn process_recurring_transactions(state: State<DbState>) -> Result<i32, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
 
     let today: String = conn
         .query_row("SELECT DATE('now')", [], |row| row.get(0))
@@ -227,10 +232,12 @@ pub fn process_recurring_transactions(state: State<DbState>) -> Result<i32, Stri
                  WHERE t.is_recurring = 1 AND t.next_due_date IS NOT NULL AND t.next_due_date <= ?1",
             )
             .map_err(|e| e.to_string())?;
-        stmt.query_map([today.as_str()], |row| row_to_transaction(row))
+        let x: Vec<Transaction> = stmt
+            .query_map([today.as_str()], |row| row_to_transaction(row))
             .map_err(|e| e.to_string())?
             .filter_map(|r| r.ok())
-            .collect()
+            .collect();
+        x
     };
 
     let mut count = 0i32;

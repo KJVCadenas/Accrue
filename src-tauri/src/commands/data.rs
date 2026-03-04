@@ -1,4 +1,4 @@
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 use crate::db::DbState;
 
 #[tauri::command]
@@ -9,7 +9,8 @@ pub async fn export_transactions_csv(
     use tauri_plugin_dialog::DialogExt;
 
     let rows = {
-        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        let guard = state.0.lock().map_err(|e| e.to_string())?;
+        let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
         let mut stmt = conn
             .prepare(
                 "SELECT t.id, a.name, c.name, t.type, t.amount, t.date, t.notes, t.is_recurring
@@ -68,9 +69,19 @@ pub async fn export_transactions_csv(
 }
 
 #[tauri::command]
-pub async fn backup_database(app: AppHandle) -> Result<(), String> {
+pub async fn backup_database(
+    app: AppHandle,
+    state: State<'_, DbState>,
+) -> Result<(), String> {
     use tauri_plugin_dialog::DialogExt;
-    use tauri::Manager;
+
+    // Require the database to be unlocked before allowing backup
+    {
+        let guard = state.0.lock().map_err(|e| e.to_string())?;
+        if guard.is_none() {
+            return Err("Database is locked. Unlock the app before backing up.".into());
+        }
+    }
 
     let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let db_path = data_dir.join("accrue.sqlite");
@@ -90,9 +101,11 @@ pub async fn backup_database(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn restore_database(app: AppHandle, _state: State<'_, DbState>) -> Result<(), String> {
+pub async fn restore_database(
+    app: AppHandle,
+    state: State<'_, DbState>,
+) -> Result<(), String> {
     use tauri_plugin_dialog::DialogExt;
-    use tauri::Manager;
 
     let src = app
         .dialog()
@@ -100,10 +113,14 @@ pub async fn restore_database(app: AppHandle, _state: State<'_, DbState>) -> Res
         .blocking_pick_file();
 
     if let Some(file_path) = src {
+        // Close the current connection before overwriting the file
+        *state.0.lock().unwrap() = None;
+
         let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
         let db_path = data_dir.join("accrue.sqlite");
         let src_str = file_path.to_string();
         std::fs::copy(&src_str, &db_path).map_err(|e| e.to_string())?;
+        // DB is now None — frontend will detect is_locked=true and show lock screen
     }
 
     Ok(())
@@ -111,7 +128,8 @@ pub async fn restore_database(app: AppHandle, _state: State<'_, DbState>) -> Res
 
 #[tauri::command]
 pub fn reset_all_data(state: State<DbState>) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
     conn.execute_batch(
         "PRAGMA foreign_keys = OFF;
          DELETE FROM transactions;
@@ -122,7 +140,6 @@ pub fn reset_all_data(state: State<DbState>) -> Result<(), String> {
     )
     .map_err(|e| e.to_string())?;
 
-    // Re-seed categories
     let defaults = vec![
         ("Salary", "income", "💼"),
         ("Freelance", "income", "💻"),

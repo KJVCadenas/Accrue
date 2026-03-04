@@ -15,7 +15,8 @@ fn row_to_category(row: &rusqlite::Row) -> rusqlite::Result<Category> {
 
 #[tauri::command]
 pub fn list_categories(state: State<DbState>) -> Result<Vec<Category>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
     let mut stmt = conn
         .prepare(
             "SELECT id, name, direction, icon, is_archived, created_at
@@ -39,7 +40,8 @@ pub fn create_category(
     direction: String,
     icon: Option<String>,
 ) -> Result<Category, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
     conn.execute(
         "INSERT INTO categories (name, direction, icon) VALUES (?1, ?2, ?3)",
         rusqlite::params![name, direction, icon],
@@ -63,7 +65,8 @@ pub fn update_category(
     direction: String,
     icon: Option<String>,
 ) -> Result<Category, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
     conn.execute(
         "UPDATE categories SET name=?1, direction=?2, icon=?3 WHERE id=?4",
         rusqlite::params![name, direction, icon, id],
@@ -80,7 +83,8 @@ pub fn update_category(
 
 #[tauri::command]
 pub fn archive_category(state: State<DbState>, id: i64) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
     conn.execute(
         "UPDATE categories SET is_archived = 1 WHERE id = ?1",
         [id],
@@ -91,7 +95,8 @@ pub fn archive_category(state: State<DbState>, id: i64) -> Result<(), String> {
 
 #[tauri::command]
 pub fn restore_category(state: State<DbState>, id: i64) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
     conn.execute(
         "UPDATE categories SET is_archived = 0 WHERE id = ?1",
         [id],

@@ -1,3 +1,16 @@
+export interface AuthStatus {
+  is_first_run: boolean;
+  is_locked: boolean;
+  biometric_enabled: boolean;
+  rate_limited: boolean;
+  rate_limit_seconds: number;
+}
+
+export interface SecuritySettings {
+  biometric_enabled: boolean;
+  auto_lock_minutes: number;
+}
+
 export interface Account {
   id: number;
   name: string;

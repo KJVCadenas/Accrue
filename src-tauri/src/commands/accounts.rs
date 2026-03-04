@@ -22,7 +22,8 @@ fn row_to_account(row: &rusqlite::Row) -> rusqlite::Result<Account> {
 
 #[tauri::command]
 pub fn list_accounts(state: State<DbState>) -> Result<Vec<AccountWithBalance>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
     let mut stmt = conn
         .prepare(
             "SELECT id, name, type, subtype, currency, opening_balance, credit_limit,
@@ -40,7 +41,7 @@ pub fn list_accounts(state: State<DbState>) -> Result<Vec<AccountWithBalance>, S
     let result = accounts
         .iter()
         .map(|a| {
-            let balance = compute_balance(&conn, a);
+            let balance = compute_balance(conn, a);
             AccountWithBalance {
                 id: a.id,
                 name: a.name.clone(),
@@ -64,7 +65,8 @@ pub fn list_accounts(state: State<DbState>) -> Result<Vec<AccountWithBalance>, S
 
 #[tauri::command]
 pub fn get_account(state: State<DbState>, id: i64) -> Result<AccountWithBalance, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
     let account = conn
         .query_row(
             "SELECT id, name, type, subtype, currency, opening_balance, credit_limit,
@@ -75,7 +77,7 @@ pub fn get_account(state: State<DbState>, id: i64) -> Result<AccountWithBalance,
         )
         .map_err(|e| e.to_string())?;
 
-    let balance = compute_balance(&conn, &account);
+    let balance = compute_balance(conn, &account);
     Ok(AccountWithBalance {
         id: account.id,
         name: account.name,
@@ -104,7 +106,8 @@ pub fn create_account(
     billing_cycle_day: Option<i64>,
     payment_due_day: Option<i64>,
 ) -> Result<AccountWithBalance, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
     conn.execute(
         "INSERT INTO accounts (name, type, subtype, opening_balance, credit_limit, billing_cycle_day, payment_due_day)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
@@ -123,7 +126,7 @@ pub fn create_account(
         )
         .map_err(|e| e.to_string())?;
 
-    let balance = compute_balance(&conn, &account);
+    let balance = compute_balance(conn, &account);
     Ok(AccountWithBalance {
         id: account.id,
         name: account.name,
@@ -153,7 +156,8 @@ pub fn update_account(
     billing_cycle_day: Option<i64>,
     payment_due_day: Option<i64>,
 ) -> Result<AccountWithBalance, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
     conn.execute(
         "UPDATE accounts SET name=?1, type=?2, subtype=?3, opening_balance=?4,
          credit_limit=?5, billing_cycle_day=?6, payment_due_day=?7,
@@ -172,7 +176,7 @@ pub fn update_account(
         )
         .map_err(|e| e.to_string())?;
 
-    let balance = compute_balance(&conn, &account);
+    let balance = compute_balance(conn, &account);
     Ok(AccountWithBalance {
         id: account.id,
         name: account.name,
@@ -192,7 +196,8 @@ pub fn update_account(
 
 #[tauri::command]
 pub fn archive_account(state: State<DbState>, id: i64) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
     conn.execute(
         "UPDATE accounts SET is_active = 0, updated_at = datetime('now') WHERE id = ?1",
         [id],
@@ -203,7 +208,8 @@ pub fn archive_account(state: State<DbState>, id: i64) -> Result<(), String> {
 
 #[tauri::command]
 pub fn restore_account(state: State<DbState>, id: i64) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
     conn.execute(
         "UPDATE accounts SET is_active = 1, updated_at = datetime('now') WHERE id = ?1",
         [id],
@@ -214,7 +220,8 @@ pub fn restore_account(state: State<DbState>, id: i64) -> Result<(), String> {
 
 #[tauri::command]
 pub fn delete_account(state: State<DbState>, id: i64) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
     conn.execute("DELETE FROM transactions WHERE account_id = ?1", [id])
         .map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM accounts WHERE id = ?1", [id])

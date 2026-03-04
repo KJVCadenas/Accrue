@@ -25,7 +25,8 @@ pub fn create_transfer(
     notes: Option<String>,
     transfer_type: Option<String>,
 ) -> Result<Transfer, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
     let ttype = transfer_type.unwrap_or_else(|| "regular".to_string());
 
     conn.execute(
@@ -64,7 +65,8 @@ pub fn create_transfer(
 
 #[tauri::command]
 pub fn delete_transfer(state: State<DbState>, id: i64) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
     conn.execute("DELETE FROM transactions WHERE transfer_id = ?1", [id])
         .map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM transfers WHERE id = ?1", [id])
@@ -74,7 +76,8 @@ pub fn delete_transfer(state: State<DbState>, id: i64) -> Result<(), String> {
 
 #[tauri::command]
 pub fn get_transfer(state: State<DbState>, id: i64) -> Result<Transfer, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
     conn.query_row(
         "SELECT id, from_account_id, to_account_id, amount, date, notes, transfer_type, created_at
          FROM transfers WHERE id = ?1",
@@ -93,7 +96,8 @@ pub fn update_transfer(
     notes: Option<String>,
     transfer_type: String,
 ) -> Result<Transfer, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = guard.as_ref().ok_or_else(|| "Database is locked".to_string())?;
     conn.execute(
         "UPDATE transfers SET amount=?1, date=?2, notes=?3, transfer_type=?4 WHERE id=?5",
         rusqlite::params![amount, date, notes, transfer_type, id],
