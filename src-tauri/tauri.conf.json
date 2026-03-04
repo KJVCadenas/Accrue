@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "accrue",
+  "productName": "Accrue",
   "version": "0.1.0",
   "identifier": "com.kurtc.accrue",
   "build": {
@@ -12,9 +12,9 @@
   "app": {
     "windows": [
       {
-        "title": "accrue",
-        "width": 800,
-        "height": 600
+        "title": "Accrue",
+        "width": 1280,
+        "height": 800
       }
     ],
     "security": {

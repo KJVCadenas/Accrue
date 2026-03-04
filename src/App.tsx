@@ -1,50 +1,133 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { processRecurringTransactions } from "./lib/tauri";
+import { getAuthStatus, lockApp as lockAppCmd } from "./lib/auth";
+import Layout from "./components/Layout";
+import SetupWizard from "./pages/auth/SetupWizard";
+import LockScreen from "./pages/auth/LockScreen";
+import Dashboard from "./pages/Dashboard";
+import Transactions from "./pages/Transactions";
+import Accounts from "./pages/Accounts";
+import AccountDetail from "./pages/AccountDetail";
+import SpendingBreakdown from "./pages/SpendingBreakdown";
+import MonthlyTrends from "./pages/MonthlyTrends";
+import Categories from "./pages/settings/Categories";
+import AccountsManagement from "./pages/settings/AccountsManagement";
+import DataBackup from "./pages/settings/DataBackup";
+import SecuritySettings from "./pages/settings/Security";
+
+type AppState = "loading" | "setup" | "locked" | "unlocked";
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  const [appState, setAppState] = useState<AppState>("loading");
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [autoLockMinutes, setAutoLockMinutes] = useState(5);
+  const lastActivityRef = useRef(Date.now());
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
+  const refreshAuthStatus = useCallback(async () => {
+    const status = await getAuthStatus();
+    setBiometricEnabled(status.biometric_enabled);
+    if (status.is_first_run) {
+      setAppState("setup");
+    } else if (status.is_locked) {
+      setAppState("locked");
+    } else {
+      setAppState("unlocked");
+    }
+  }, []);
+
+  // Initial auth check
+  useEffect(() => {
+    refreshAuthStatus();
+  }, [refreshAuthStatus]);
+
+  // Process recurring transactions only after unlocking
+  useEffect(() => {
+    if (appState === "unlocked") {
+      processRecurringTransactions().catch(console.error);
+    }
+  }, [appState]);
+
+  const doLock = useCallback(async () => {
+    await lockAppCmd();
+    setAppState("locked");
+  }, []);
+
+  // Auto-lock idle timer — checks every 30 seconds
+  useEffect(() => {
+    if (appState !== "unlocked" || autoLockMinutes === 0) return;
+    const interval = setInterval(async () => {
+      const idle = Date.now() - lastActivityRef.current;
+      if (idle > autoLockMinutes * 60 * 1000) {
+        await doLock();
+      }
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [appState, autoLockMinutes, doLock]);
+
+  // Activity listeners — reset idle timer on user interaction
+  useEffect(() => {
+    if (appState !== "unlocked") return;
+    const reset = () => { lastActivityRef.current = Date.now(); };
+    window.addEventListener("mousemove", reset, { passive: true });
+    window.addEventListener("keydown", reset, { passive: true });
+    window.addEventListener("click", reset, { passive: true });
+    return () => {
+      window.removeEventListener("mousemove", reset);
+      window.removeEventListener("keydown", reset);
+      window.removeEventListener("click", reset);
+    };
+  }, [appState]);
+
+  // Window blur auto-lock (only when auto-lock is enabled)
+  useEffect(() => {
+    if (appState !== "unlocked" || autoLockMinutes === 0) return;
+    window.addEventListener("blur", doLock);
+    return () => window.removeEventListener("blur", doLock);
+  }, [appState, autoLockMinutes, doLock]);
+
+  if (appState === "loading") {
+    return <div className="auth-loading">Loading…</div>;
+  }
+
+  if (appState === "setup") {
+    return <SetupWizard onComplete={() => setAppState("unlocked")} />;
+  }
+
+  if (appState === "locked") {
+    return (
+      <LockScreen
+        biometricEnabled={biometricEnabled}
+        onUnlocked={() => setAppState("unlocked")}
+      />
+    );
   }
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+    <MemoryRouter>
+      <Routes>
+        <Route element={<Layout onLock={doLock} />}>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/transactions" element={<Transactions />} />
+          <Route path="/accounts" element={<Accounts />} />
+          <Route path="/accounts/:id" element={<AccountDetail />} />
+          <Route path="/reports/breakdown" element={<SpendingBreakdown />} />
+          <Route path="/reports/trends" element={<MonthlyTrends />} />
+          <Route path="/settings/categories" element={<Categories />} />
+          <Route path="/settings/accounts" element={<AccountsManagement />} />
+          <Route path="/settings/data" element={<DataBackup />} />
+          <Route
+            path="/settings/security"
+            element={
+              <SecuritySettings
+                onAutoLockChange={setAutoLockMinutes}
+                onLock={doLock}
+              />
+            }
+          />
+        </Route>
+      </Routes>
+    </MemoryRouter>
   );
 }
 

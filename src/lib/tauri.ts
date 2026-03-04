@@ -1,0 +1,182 @@
+import { invoke } from "@tauri-apps/api/core";
+import {
+  AccountWithBalance,
+  Category,
+  CreateTransactionInput,
+  CreateTransferInput,
+  DashboardData,
+  MonthSummary,
+  SpendingBreakdown,
+  Transaction,
+  Transfer,
+} from "../types";
+
+export const listAccounts = () =>
+  invoke<AccountWithBalance[]>("list_accounts");
+
+export const getAccount = (id: number) =>
+  invoke<AccountWithBalance>("get_account", { id });
+
+export const createAccount = (data: {
+  name: string;
+  account_type: string;
+  subtype?: string | null;
+  opening_balance: number;
+  credit_limit?: number | null;
+  billing_cycle_day?: number | null;
+  payment_due_day?: number | null;
+}) =>
+  invoke<AccountWithBalance>("create_account", {
+    name: data.name,
+    accountType: data.account_type,
+    subtype: data.subtype,
+    openingBalance: data.opening_balance,
+    creditLimit: data.credit_limit,
+    billingCycleDay: data.billing_cycle_day,
+    paymentDueDay: data.payment_due_day,
+  });
+
+export const updateAccount = (
+  id: number,
+  data: {
+    name: string;
+    account_type: string;
+    subtype?: string | null;
+    opening_balance: number;
+    credit_limit?: number | null;
+    billing_cycle_day?: number | null;
+    payment_due_day?: number | null;
+  }
+) =>
+  invoke<AccountWithBalance>("update_account", {
+    id,
+    name: data.name,
+    accountType: data.account_type,
+    subtype: data.subtype,
+    openingBalance: data.opening_balance,
+    creditLimit: data.credit_limit,
+    billingCycleDay: data.billing_cycle_day,
+    paymentDueDay: data.payment_due_day,
+  });
+
+export const archiveAccount = (id: number) =>
+  invoke<void>("archive_account", { id });
+
+export const restoreAccount = (id: number) =>
+  invoke<void>("restore_account", { id });
+
+export const deleteAccount = (id: number) =>
+  invoke<void>("delete_account", { id });
+
+export const listTransactions = (filters?: {
+  account_id?: number | null;
+  category_id?: number | null;
+  tx_type?: string | null;
+  date_from?: string | null;
+  date_to?: string | null;
+  search?: string | null;
+}) => {
+  const f = filters ?? {};
+  return invoke<Transaction[]>("list_transactions", {
+    accountId: f.account_id,
+    categoryId: f.category_id,
+    txType: f.tx_type,
+    dateFrom: f.date_from,
+    dateTo: f.date_to,
+    search: f.search,
+  });
+};
+
+export const createTransaction = (data: CreateTransactionInput) =>
+  invoke<Transaction>("create_transaction", {
+    accountId: data.account_id,
+    categoryId: data.category_id,
+    txType: data.tx_type,
+    amount: data.amount,
+    date: data.date,
+    notes: data.notes,
+    isRecurring: data.is_recurring,
+    recurrenceFrequency: data.recurrence_frequency,
+    nextDueDate: data.next_due_date,
+  });
+
+export const updateTransaction = (id: number, data: CreateTransactionInput) =>
+  invoke<Transaction>("update_transaction", {
+    id,
+    accountId: data.account_id,
+    categoryId: data.category_id,
+    txType: data.tx_type,
+    amount: data.amount,
+    date: data.date,
+    notes: data.notes,
+    isRecurring: data.is_recurring,
+    recurrenceFrequency: data.recurrence_frequency,
+    nextDueDate: data.next_due_date,
+  });
+
+export const deleteTransaction = (id: number) =>
+  invoke<void>("delete_transaction", { id });
+
+export const createTransfer = (data: CreateTransferInput) =>
+  invoke<Transfer>("create_transfer", {
+    fromAccountId: data.from_account_id,
+    toAccountId: data.to_account_id,
+    amount: data.amount,
+    date: data.date,
+    notes: data.notes,
+    transferType: data.transfer_type,
+  });
+
+export const deleteTransfer = (id: number) =>
+  invoke<void>("delete_transfer", { id });
+
+export const getTransfer = (id: number) =>
+  invoke<Transfer>("get_transfer", { id });
+
+export const updateTransfer = (id: number, data: { amount: number; date: string; notes: string | null; transfer_type: string }) =>
+  invoke<Transfer>("update_transfer", {
+    id,
+    amount: data.amount,
+    date: data.date,
+    notes: data.notes,
+    transferType: data.transfer_type,
+  });
+
+export const listCategories = () => invoke<Category[]>("list_categories");
+
+export const createCategory = (data: {
+  name: string;
+  direction: string;
+  icon?: string | null;
+}) => invoke<Category>("create_category", data);
+
+export const updateCategory = (
+  id: number,
+  data: { name: string; direction: string; icon?: string | null }
+) => invoke<Category>("update_category", { id, ...data });
+
+export const archiveCategory = (id: number) =>
+  invoke<void>("archive_category", { id });
+
+export const restoreCategory = (id: number) =>
+  invoke<void>("restore_category", { id });
+
+export const getDashboard = () => invoke<DashboardData>("get_dashboard");
+
+export const getSpendingBreakdown = (year: number, month: number) =>
+  invoke<SpendingBreakdown>("get_spending_breakdown", { year, month });
+
+export const getMonthlyTrends = (months: number) =>
+  invoke<MonthSummary[]>("get_monthly_trends", { months });
+
+export const processRecurringTransactions = () =>
+  invoke<number>("process_recurring_transactions");
+
+export const exportTransactionsCsv = () =>
+  invoke<void>("export_transactions_csv");
+
+export const backupDatabase = () => invoke<void>("backup_database");
+
+export const restoreDatabase = () => invoke<void>("restore_database");
+
+export const resetAllData = () => invoke<void>("reset_all_data");
