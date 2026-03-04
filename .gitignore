@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local Cargo config (Windows-only Strawberry Perl path, not portable)
+.cargo/
+
+# Claude Code local settings
+.claude/
